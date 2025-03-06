@@ -1,0 +1,278 @@
+1. Add Item to Order:
+Write a stored procedure to add a selected item to a customer's order,
+ensuring stock availability is checked before adding.
+CREATE PROCEDURE AddItemToOrder 
+    @OrderId INT,           -- The ID of the order to which the item is being added
+    @ItemId INT,            -- The ID of the item to be added
+    @Quantity INT           -- The quantity of the item to be added
+AS
+BEGIN
+    -- Declare a variable to hold the current stock quantity of the item
+    DECLARE @StockQuantity INT;
+
+    -- Step 1: Check if the item exists and if there is enough stock
+    SELECT @StockQuantity = quantity
+    FROM Item
+    WHERE item_id = @ItemId;
+
+    -- If the item doesn't exist or doesn't have enough stock, return an error
+    IF @StockQuantity IS NULL
+    BEGIN
+        PRINT 'Item does not exist.';
+        RETURN;
+    END
+
+    IF @StockQuantity < @Quantity
+    BEGIN
+        PRINT 'Not enough stock available for this item.';
+        RETURN;
+    END
+
+    -- Step 2: Insert the item into the OrderItems table (linking the order and the item)
+    INSERT INTO OrderItems (order_id, item_id, quantity)
+    VALUES (@OrderId, @ItemId, @Quantity);
+
+    -- Step 3: Update the stock quantity in the Item table
+    UPDATE Item
+    SET quantity = quantity - @Quantity
+    WHERE item_id = @ItemId;
+
+    -- Return success message
+    PRINT 'Item added to the order successfully.';
+END;
+/*
+EXEC AddItemToOrder 
+    @OrderId = 101,   
+    @ItemId = 5,     
+*/
+
+2. Manage Discounts:
+Implement a stored procedure to apply or update discounts for specific
+items or categories.
+
+CREATE PROCEDURE ManageDiscounts
+    @ItemId INT = NULL,          -- The ID of the item for which discount is being applied (NULL for category-based discount)
+    @Category VARCHAR(255) = NULL, -- The category to apply the discount (NULL for item-specific discount)
+    @DiscountType VARCHAR(10),   -- The type of discount: 'Percentage' or 'Amount'
+    @DiscountValue DECIMAL(10, 2), -- The discount value (percentage or fixed amount)
+    @IsUpdate BIT = 0           -- Flag indicating whether we are updating an existing discount (1 for update, 0 for apply)
+AS
+BEGIN
+    -- Check if the discount type is valid
+    IF @DiscountType NOT IN ('Percentage', 'Amount')
+    BEGIN
+        PRINT 'Invalid discount type. Please choose "Percentage" or "Amount".';
+        RETURN;
+    END
+
+    -- If ItemId is provided, apply discount for a specific item
+    IF @ItemId IS NOT NULL
+    BEGIN
+        IF @IsUpdate = 1
+        BEGIN
+            -- Update the discount for the specific item
+            UPDATE Item
+            SET 
+                discount = CASE WHEN @DiscountType = 'Percentage' THEN @DiscountValue ELSE discount END,
+                discountAmount = CASE WHEN @DiscountType = 'Amount' THEN @DiscountValue ELSE discountAmount END
+            WHERE item_id = @ItemId;
+            
+            PRINT 'Discount updated for the item.';
+        END
+        ELSE
+        BEGIN
+            -- Apply new discount for the specific item
+            UPDATE Item
+            SET 
+                discount = CASE WHEN @DiscountType = 'Percentage' THEN @DiscountValue ELSE discount END,
+                discountAmount = CASE WHEN @DiscountType = 'Amount' THEN @DiscountValue ELSE discountAmount END
+            WHERE item_id = @ItemId;
+            
+            PRINT 'Discount applied to the item.';
+        END
+    END
+    -- If Category is provided, apply discount for all items in the specified category
+    ELSE IF @Category IS NOT NULL
+    BEGIN
+        IF @IsUpdate = 1
+        BEGIN
+            -- Update the discount for all items in the category
+            UPDATE Item
+            SET 
+                discount = CASE WHEN @DiscountType = 'Percentage' THEN @DiscountValue ELSE discount END,
+                discountAmount = CASE WHEN @DiscountType = 'Amount' THEN @DiscountValue ELSE discountAmount END
+            WHERE category = @Category;
+            
+            PRINT 'Discount updated for items in the category.';
+        END
+        ELSE
+        BEGIN
+            -- Apply new discount for all items in the category
+            UPDATE Item
+            SET 
+                discount = CASE WHEN @DiscountType = 'Percentage' THEN @DiscountValue ELSE discount END,
+                discountAmount = CASE WHEN @DiscountType = 'Amount' THEN @DiscountValue ELSE discountAmount END
+            WHERE category = @Category;
+            
+            PRINT 'Discount applied to items in the category.';
+        END
+    END
+    ELSE
+    BEGIN
+        PRINT 'Please specify either an item or a category to apply the discount.';
+        RETURN;
+    END
+END;
+/*
+EXEC ManageDiscounts 
+    @Category = 'Electronics', 
+    @DiscountType = 'Amount', 
+    @DiscountValue = 5.00, 
+    @IsUpdate = 0;
+
+*/
+
+3. Generate Sales Report:
+Create a stored procedure to generate a detailed sales report for a given
+period, including itemized sales and total revenue.
+
+CREATE PROCEDURE GenerateSalesReport
+    @StartDate DATE,         -- The start date for the report
+    @EndDate DATE            -- The end date for the report
+AS
+BEGIN
+    -- Temporary table to store the itemized sales data
+    CREATE TABLE #SalesReport
+    (
+        order_id INT,
+        item_name VARCHAR(255),
+        quantity INT,
+        price DECIMAL(10, 2),
+        total_price DECIMAL(10, 2)
+    );
+
+    -- Insert itemized sales data into the temporary table
+    INSERT INTO #SalesReport (order_id, item_name, quantity, price, total_price)
+    SELECT 
+        o.order_id,
+        i.name AS item_name,
+        oi.quantity,
+        i.price,
+        oi.quantity * i.price AS total_price
+    FROM 
+        Orderr as o
+    JOIN 
+        OrderItems oi ON o.order_id = oi.order_id
+    JOIN 
+        Item i ON oi.item_id = i.item_id
+    WHERE 
+        o.order_date BETWEEN @StartDate AND @EndDate;  -- Filter by the given date range
+
+    -- Retrieve the itemized sales data and total revenue
+    SELECT 
+        item_name,
+        SUM(quantity) AS total_quantity_sold,
+        price,
+        SUM(total_price) AS total_sales
+    FROM 
+        #SalesReport
+    GROUP BY 
+        item_name, price
+    ORDER BY 
+        total_sales DESC;  -- Optionally, you can order by total sales or item name.
+
+    -- Calculate and return the total revenue for the given period
+    SELECT 
+        SUM(total_price) AS total_revenue
+    FROM 
+        #SalesReport;
+
+    -- Drop the temporary table to clean up
+    DROP TABLE #SalesReport;
+END;
+
+
+4. Process Item Request:
+Develop a stored procedure for the admin to process product requests
+submitted by customers, with options to approve or reject the request.
+
+CREATE PROCEDURE ProcessProductRequestt
+    @RequestId INT,           -- The ID of the product request
+    @AdminId INT,             -- The ID of the admin processing the request
+    @Action VARCHAR(10)       -- The action to be taken: 'Approve' or 'Reject'
+AS
+BEGIN
+    DECLARE @RequestedQuantity INT,   -- Quantity requested by the customer
+            @ItemId INT,             -- The ID of the requested item
+            @CurrentStock INT,       -- Current stock of the item
+            @NewStock INT;           -- Updated stock after approval
+
+    -- Step 1: Retrieve the product request details
+    SELECT 
+        @RequestedQuantity = requested_quantity, 
+        @ItemId = item_id
+    FROM 
+        dbo.ProductRequests   -- Include schema name if necessary
+    WHERE 
+        request_id = @RequestId;
+
+    -- Step 2: Check if the request exists
+    IF @RequestedQuantity IS NULL
+    BEGIN
+        PRINT 'Request not found.';
+        RETURN;
+    END
+
+    -- Step 3: Retrieve the current stock of the requested item
+    SELECT 
+        @CurrentStock = quantity
+    FROM 
+        dbo.Item   -- Include schema name if necessary
+    WHERE 
+        item_id = @ItemId;
+
+    -- Step 4: Process based on the admin's action
+    IF @Action = 'Approve'
+    BEGIN
+        -- Check if enough stock is available for approval
+        IF @CurrentStock >= @RequestedQuantity
+        BEGIN
+            -- Update the ProductRequest status to Approved
+            UPDATE dbo.ProductRequests   -- Include schema name if necessary
+            SET status = 'Approved'
+            WHERE request_id = @RequestId;
+
+            -- Update stock after approval
+            SET @NewStock = @CurrentStock - @RequestedQuantity;
+
+            -- Update the stock quantity in the Item table
+            UPDATE dbo.Item   -- Include schema name if necessary
+            SET quantity = @NewStock
+            WHERE item_id = @ItemId;
+
+            PRINT 'Product request approved and stock updated.';
+        END
+        ELSE
+        BEGIN
+            PRINT 'Not enough stock available for approval.';
+        END
+    END
+    ELSE IF @Action = 'Reject'
+    BEGIN
+        -- Reject the product request
+        UPDATE dbo.ProductRequests   -- Include schema name if necessary
+        SET status = 'Rejected'
+        WHERE request_id = @RequestId;
+
+        PRINT 'Product request rejected.';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Invalid action. Use "Approve" or "Reject".';
+    END
+END;
+
+EXEC ProcessProductRequest 
+    @RequestId = 6, 
+    @AdminId = 1, 
+    @Action = 'Reject';

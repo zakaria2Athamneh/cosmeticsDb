@@ -1,0 +1,52 @@
+1. Active Items View:
+Create a view to display all items currently available for sale, including
+category, brand, price, and discount amount.
+
+CREATE VIEW ActiveItems AS
+SELECT 
+    i.name AS item_name,
+    i.category,
+    i.brand,
+    i.price,
+    i.discountAmount
+FROM 
+    Item i
+WHERE 
+    i.quantity > 0;  
+
+
+2. Customer Wishlist View:
+Implement a view to show all wishlist items for each customer, including
+item details and quantities.
+CREATE VIEW CustomerWishlist AS
+SELECT 
+    p.fullName AS customer_name,
+    i.name AS item_name,
+    i.category,
+    i.brand,
+    i.price,
+    i.discountAmount
+FROM 
+    Wishlist wi
+JOIN 
+    person p ON wi.client_id = p.person_id  
+JOIN 
+    Item i ON wi.item_id = i.item_id     
+
+3. Sales Summary View:
+Create a view summarizing total sales by month, including revenue and
+number of orders.
+CREATE VIEW SalesSummary AS
+SELECT 
+    YEAR(o.order_date) AS order_year,     
+    MONTH(o.order_date) AS order_month,    
+    COUNT(DISTINCT o.order_id) AS num_orders, 
+    SUM(oi.quantity * i.price) AS total_revenue  
+FROM 
+    Orderr as o
+JOIN 
+    OrderItems oi ON o.order_id = oi.order_id 
+JOIN 
+    Item i ON oi.item_id = i.item_id         
+GROUP BY 
+    YEAR(o.order_date), MONTH(o.order_date);  

@@ -1,0 +1,72 @@
+CREATE TABLE Person (
+    person_id INT PRIMARY KEY identity(1,1),  
+    fullName VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,       
+    password VARCHAR(255) NOT NULL,
+    profileImage VARCHAR(255) DEFAULT 'default.png', 
+    phoneNumber VARCHAR(15),
+    nationality VARCHAR(50),
+   
+);
+
+CREATE TABLE Item (
+    item_id INT PRIMARY KEY identity(1,1),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    image VARCHAR(255),
+    category VARCHAR(50),
+    brand VARCHAR(50), 
+    quantity INT CHECK (quantity >= 0),  
+    cost DECIMAL(10, 2) CHECK (cost > 0),     
+    price DECIMAL(10, 2) CHECK (price > 0),   
+    discount DECIMAL(5, 2) CHECK (discount >= 0 AND discount <= 100), 
+    discountAmount DECIMAL(10, 2),
+    admin_id INT,                            
+    FOREIGN KEY (admin_id) REFERENCES Person(person_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE Orderr (
+    order_id INT PRIMARY KEY identity(1,1),   
+    client_id INT,                             
+    order_date Date,
+    FOREIGN KEY (client_id) REFERENCES Person(person_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE OrderItems (
+    order_id INT,                            
+    item_id INT,                            
+    quantity INT CHECK (quantity > 0),       
+    PRIMARY KEY (order_id, item_id),        
+    FOREIGN KEY (order_id) REFERENCES Orderr(order_id) ON DELETE NO ACTION,  
+    FOREIGN KEY (item_id) REFERENCES Item(item_id) ON DELETE NO ACTION   
+);
+CREATE TABLE Wishlist (
+    client_id INT,                             -- Foreign Key to Client (Person)
+    item_id INT,                               -- Foreign Key to Item
+    PRIMARY KEY (client_id, item_id),          -- Composite Primary Key
+    FOREIGN KEY (client_id) REFERENCES Person(person_id) ON DELETE  NO ACTION ,
+    FOREIGN KEY (item_id) REFERENCES Item(item_id) ON DELETE  NO ACTION
+);
+CREATE TABLE ProductRequests (
+    request_id INT PRIMARY KEY IDENTITY(1,1),
+    customer_id INT,                  -- The customer who requested the product
+    item_id INT,                      -- The requested item
+    requested_quantity INT,           -- The quantity requested
+    request_date DATETIME DEFAULT GETDATE(),
+    status VARCHAR(20) DEFAULT 'Pending',  -- Pending, Approved, Rejected
+    FOREIGN KEY (customer_id) REFERENCES Person(person_id),
+    FOREIGN KEY (item_id) REFERENCES Item(item_id)
+);
+
+
+CREATE TABLE Rating (
+    client_id INT,                             -- Foreign Key to Client (Person)
+    item_id INT,                               -- Foreign Key to Item
+    rating INT CHECK (rating >= 1 AND rating <= 5), -- Ensure rating is between 1 and 5
+    review TEXT,
+    PRIMARY KEY (client_id, item_id),          -- Composite Primary Key
+    FOREIGN KEY (client_id) REFERENCES Person(person_id)  ON DELETE  NO ACTION,
+    FOREIGN KEY (item_id) REFERENCES Item(item_id)  ON DELETE  NO ACTION
+);

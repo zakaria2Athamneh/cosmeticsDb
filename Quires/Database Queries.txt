@@ -1,0 +1,87 @@
+1. Retrieve Items by Category:
+o Write a query to fetch all items based on a selected category, including details
+such as name, price, and discount status.
+SELECT 
+    name, 
+    price, 
+    discount,
+    discountAmount,
+   CASE 
+        WHEN discount > 0 THEN 'Yes'
+        ELSE 'No'
+    END AS discount_status
+FROM 
+    Item
+WHERE 
+    category = 'Electronics';  
+
+2. Search Items:
+o Implement a query to search for items by name or description using a keyword.
+DECLARE @keyword NVARCHAR(100);
+SET @keyword = 'laptop';  -- Replace 'laptop' with the desired search keyword
+
+SELECT 
+    name, 
+    description, 
+    price, 
+    discount,
+    discountAmount
+FROM 
+    Item
+WHERE 
+    name LIKE '%' + @keyword + '%' 
+    OR description LIKE '%' + @keyword + '%';
+
+
+3. Customer Purchase History:
+o Create a query to fetch the purchase history of a specific customer, including
+item details, quantities, and total spent.
+DECLARE @customerId INT;
+SET @customerId = 1; 
+
+SELECT 
+    o.order_id, 
+    i.name AS item_name, 
+    oi.quantity, 
+    i.price, 
+    (oi.quantity * i.price) AS total_spent_per_item, 
+    o.order_date,
+    SUM(oi.quantity * i.price) OVER(PARTITION BY o.order_id) AS total_spent_per_order
+FROM 
+    Orderr as o  
+JOIN 
+    OrderItems oi ON o.order_id = oi.order_id
+JOIN 
+    Item i ON oi.item_id = i.item_id
+WHERE 
+    o.client_id = @customerId
+ORDER BY 
+    o.order_date DESC;
+
+4. Top-Selling Products:
+o Write a query to identify the top-selling products based on order quantities
+within a specified timeframe.
+
+DECLARE @startDate DATE;
+DECLARE @endDate DATE;
+
+SET @startDate = '2025-01-01'; 
+SET @endDate = '2025-03-01';   
+
+SELECT 
+    i.name AS item_name,
+    SUM(oi.quantity) AS total_quantity_sold,
+    i.price,
+    (SUM(oi.quantity) * i.price) AS total_sales_value
+FROM 
+    OrderItems oi
+JOIN 
+    Item i ON oi.item_id = i.item_id
+JOIN 
+    Orderr as o ON oi.order_id = o.order_id
+WHERE 
+    o.order_date BETWEEN @startDate AND @endDate 
+GROUP BY 
+    i.name, i.price
+ORDER BY 
+    total_quantity_sold DESC;
